@@ -4,7 +4,6 @@ import { useAuth } from "../../Hook/useAuth";
 import { supabase } from "../../lib/supabaseClient";
 import styles from "./dashboard.module.css";
 import { useNavigate } from "react-router-dom";
-import z from "zod";
 
 type Movimentacao = {
   drs_id: string;
@@ -25,24 +24,8 @@ type DBResponse = {
   drs_dt_pagamento?: string | null;
   tipo_receita: {
     tpr_tipo: string;
-  }[];
+  }[]; // ⚠️ array
 };
-
-const dbResponseSchema = z.array(
-  z.object({
-    drs_id: z.string(),
-    drs_valor: z.number(),
-    drs_descricao: z.string(),
-    is_paid: z.boolean(),
-    drs_dt_lancamento: z.string(),
-    drs_dt_pagamento: z.string().nullable().optional(),
-    tipo_receita: z.array(
-      z.object({
-        tpr_tipo: z.string(),
-      })
-    ),
-  })
-);
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -63,9 +46,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     document.title = "Dashboard - Sistema Financeiro";
-    if (user?.id) {
-      fetchDashboard(user.id);
-    }
+    if (user?.id) fetchDashboard(user.id);
   }, [user, mes, ano]);
 
   async function fetchDashboard(userId: string) {
@@ -97,19 +78,16 @@ export default function Dashboard() {
       return;
     }
 
+    if (!data) return;
+
     let totalReceitas = 0;
     let totalDespesas = 0;
 
-    const parsed = dbResponseSchema.safeParse(data ?? []);
-    if (!parsed.success) {
-      console.error(parsed.error);
-      return;
-    }
-
-    const mapped: Movimentacao[] = parsed.data.map((item: DBResponse) => {
-      const tipo = item.tipo_receita[0].tpr_tipo.toLowerCase() as
-        | "receita"
-        | "despesa";
+    const mapped: Movimentacao[] = (data as DBResponse[]).map((item) => {
+      const tipo =
+        item.tipo_receita?.[0]?.tpr_tipo.toLowerCase() === "receita"
+          ? "receita"
+          : "despesa";
 
       if (tipo === "receita") totalReceitas += item.drs_valor;
       else totalDespesas += item.drs_valor;
@@ -145,7 +123,7 @@ export default function Dashboard() {
       return;
     }
 
-    // 🔥 Atualiza tudo corretamente
+    // Atualiza o dashboard após deletar
     fetchDashboard(user.id);
   }
 
@@ -225,7 +203,6 @@ export default function Dashboard() {
                   <td>
                     {new Date(mov.drs_dt_lancamento).toLocaleDateString("pt-BR")}
                   </td>
-
                   <td
                     className={
                       mov.tipo === "receita"
@@ -235,11 +212,9 @@ export default function Dashboard() {
                   >
                     {mov.tipo}
                   </td>
-
                   <td>{mov.drs_descricao}</td>
                   <td>R$ {mov.drs_valor.toFixed(2)}</td>
                   <td>{mov.is_paid ? "Pago" : "Pendente"}</td>
-
                   <td className={styles.actions}>
                     <button onClick={() => handleEdit(mov.drs_id)}>✏️</button>
                     <button onClick={() => handleDelete(mov.drs_id)}>🗑️</button>
