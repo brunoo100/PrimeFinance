@@ -12,20 +12,19 @@ type TipoReceita = {
 };
 
 /* =======================
-   Schema
+   Schema Zod
 ======================= */
 const inserirSchema = z
   .object({
     descricao: z.string().min(1, "Descrição obrigatória"),
-    valor: z.coerce.number().positive("Valor deve ser maior que zero"),
+    valor: z.coerce.number().positive("Valor deve ser maior que zero").pipe(z.number()),
     tpr_id: z.string().uuid("Selecione um tipo"),
     is_paid: z.boolean(),
     drs_dt_lancamento: z.string().min(1, "Informe a data de lançamento"),
     drs_dt_pagamento: z.string().optional(),
   })
   .refine(
-    (data) =>
-      !data.is_paid || (data.is_paid && data.drs_dt_pagamento),
+    (data) => !data.is_paid || (data.is_paid && !!data.drs_dt_pagamento),
     {
       message: "Informe a data de pagamento",
       path: ["drs_dt_pagamento"],
@@ -33,6 +32,7 @@ const inserirSchema = z
   );
 
 type InserirData = z.infer<typeof inserirSchema>;
+type InserirInput = z.input<typeof inserirSchema>;
 
 export default function Inserir() {
   const { user } = useAuth();
@@ -44,15 +44,14 @@ export default function Inserir() {
     watch,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<InserirData>({
+  } = useForm<InserirInput, any, InserirData>({
     resolver: zodResolver(inserirSchema),
-    defaultValues: {
-      is_paid: false,
-    },
+    defaultValues: { is_paid: false },
   });
 
   const isPaid = watch("is_paid");
 
+  // Busca tipos de receita/despesa
   useEffect(() => {
     document.title = "Inserir - Sistema Financeiro";
 
@@ -73,7 +72,8 @@ export default function Inserir() {
     fetchTipos();
   }, []);
 
-  async function onSubmit(data: InserirData) {
+  // Submit do formulário
+  const onSubmit = handleSubmit(async (data) => {
     if (!user) {
       alert("Usuário não autenticado");
       return;
@@ -84,25 +84,23 @@ export default function Inserir() {
       drs_valor: data.valor,
       tpr_id: data.tpr_id,
       is_paid: data.is_paid,
-      drs_dt_lancamento: data.drs_dt_lancamento, // DATE
-      drs_dt_pagamento: data.is_paid
-        ? data.drs_dt_pagamento
-        : null,
+      drs_dt_lancamento: data.drs_dt_lancamento,
+      drs_dt_pagamento: data.is_paid ? data.drs_dt_pagamento : null,
       user_id: user.id,
     });
 
     if (error) {
-      alert(error.message);
+      alert("Erro ao salvar: " + error.message);
       return;
     }
 
-    reset();
+    reset(); // Limpa o formulário
     alert("Registro salvo com sucesso!");
-  }
+  });
 
   return (
     <div className={styles.container}>
-      <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+      <form onSubmit={onSubmit} className={styles.form}>
         <h1>Inserir Receita / Despesa</h1>
 
         {/* DESCRIÇÃO */}
@@ -152,8 +150,8 @@ export default function Inserir() {
 
         {/* PAGO */}
         <div className={styles.fieldCheckbox}>
-          <input type="checkbox" {...register("is_paid")} />
-          <label>Pago</label>
+          <input type="checkbox" {...register("is_paid")} id="isPaid" />
+          <label htmlFor="isPaid">Pago</label>
         </div>
 
         {/* DATA DE PAGAMENTO */}

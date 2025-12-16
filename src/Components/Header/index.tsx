@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect} from "react";
 import styles from "./header.module.css";
 import { useAuth } from "../../Hook/useAuth";
 import { useNavigate } from "react-router-dom";
