@@ -42,15 +42,13 @@ export default function Dashboard() {
   const [mes, setMes] = useState(hoje.getMonth() + 1);
   const [ano, setAno] = useState(anoAtual);
 
-  // 🔴 Modal
-  const [showModal, setShowModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
   const saldo = receitas - despesas;
 
   useEffect(() => {
     document.title = "Dashboard - Sistema Financeiro";
-    if (user?.id) fetchDashboard(user.id);
+    if (user?.id) {
+      fetchDashboard(user.id);
+    }
   }, [user, mes, ano]);
 
   async function fetchDashboard(userId: string) {
@@ -77,18 +75,21 @@ export default function Dashboard() {
       .lte("drs_dt_lancamento", fimMes)
       .order("drs_dt_lancamento", { ascending: false });
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error(error);
+      return;
+    }
 
     let totalReceitas = 0;
     let totalDespesas = 0;
 
-    const mapped = (data as DBResponse[]).map((item) => {
+    const mapped: Movimentacao[] = (data as DBResponse[]).map((item) => {
       const tipo = item.tipo_receita.tpr_tipo.toLowerCase() as
         | "receita"
         | "despesa";
 
       if (tipo === "receita") totalReceitas += item.drs_valor;
-      if (tipo === "despesa") totalDespesas += item.drs_valor;
+      else totalDespesas += item.drs_valor;
 
       return { ...item, tipo };
     });
@@ -102,26 +103,27 @@ export default function Dashboard() {
     navigate(`/movimentacao/editar/${id}`);
   }
 
-  function abrirModal(id: string) {
-    setDeleteId(id);
-    setShowModal(true);
-  }
+  async function handleDelete(id: string) {
+    if (!user?.id) return;
 
-  async function confirmarDelete() {
-    if (!deleteId) return;
+    const confirmDelete = window.confirm(
+      "Tem certeza que deseja excluir esta movimentação?"
+    );
+    if (!confirmDelete) return;
 
-    await supabase
+    const { error } = await supabase
       .from("despesa_receita")
       .delete()
-      .eq("drs_id", deleteId)
-      .eq("user_id", user?.id);
+      .eq("drs_id", id)
+      .eq("user_id", user.id);
 
-    setMovimentacoes((prev) =>
-      prev.filter((mov) => mov.drs_id !== deleteId)
-    );
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-    setShowModal(false);
-    setDeleteId(null);
+    // 🔥 Atualiza tudo corretamente
+    fetchDashboard(user.id);
   }
 
   return (
@@ -144,7 +146,9 @@ export default function Dashboard() {
 
         <select value={ano} onChange={(e) => setAno(Number(e.target.value))}>
           {anos.map((y) => (
-            <option key={y} value={y}>{y}</option>
+            <option key={y} value={y}>
+              {y}
+            </option>
           ))}
         </select>
       </div>
@@ -185,13 +189,27 @@ export default function Dashboard() {
             </thead>
 
             <tbody>
+              {movimentacoes.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center" }}>
+                    Nenhuma movimentação encontrada
+                  </td>
+                </tr>
+              )}
+
               {movimentacoes.map((mov) => (
                 <tr key={mov.drs_id}>
-                  <td>{new Date(mov.drs_dt_lancamento).toLocaleDateString("pt-BR")}</td>
+                  <td>
+                    {new Date(mov.drs_dt_lancamento).toLocaleDateString("pt-BR")}
+                  </td>
 
-                  <td className={mov.tipo === "receita"
-                    ? styles.receitaText
-                    : styles.despesaText}>
+                  <td
+                    className={
+                      mov.tipo === "receita"
+                        ? styles.receitaText
+                        : styles.despesaText
+                    }
+                  >
                     {mov.tipo}
                   </td>
 
@@ -201,7 +219,7 @@ export default function Dashboard() {
 
                   <td className={styles.actions}>
                     <button onClick={() => handleEdit(mov.drs_id)}>✏️</button>
-                    <button onClick={() => abrirModal(mov.drs_id)}>🗑️</button>
+                    <button onClick={() => handleDelete(mov.drs_id)}>🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -209,23 +227,6 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
-
-      {/* MODAL */}
-      {showModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h3>Excluir movimentação</h3>
-            <p>Tem certeza que deseja excluir?</p>
-
-            <div className={styles.modalActions}>
-              <button onClick={() => setShowModal(false)}>Cancelar</button>
-              <button className={styles.confirm} onClick={confirmarDelete}>
-                Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </Container>
   );
 }
