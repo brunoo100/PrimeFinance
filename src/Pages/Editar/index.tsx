@@ -33,6 +33,7 @@ const editarSchema = z
   );
 
 type EditarData = z.infer<typeof editarSchema>;
+type EditarInput = z.input<typeof editarSchema>;
 
 export default function Editar() {
   const { id } = useParams<{ id: string }>();
@@ -48,8 +49,16 @@ export default function Editar() {
     watch,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<EditarData>({
+  } = useForm<EditarInput, any, EditarData>({
     resolver: zodResolver(editarSchema),
+    defaultValues: {
+      descricao: "",
+      valor: 0,
+      tpr_id: "",
+      is_paid: false,
+      drs_dt_lancamento: "",
+      drs_dt_pagamento: undefined,
+    },
   });
 
   const isPaid = watch("is_paid");
@@ -78,7 +87,7 @@ export default function Editar() {
         return;
       }
 
-      setTipo(data.tipo_receita);
+      setTipo(data.tipo_receita?.[0] || null);
 
       reset({
         descricao: data.drs_descricao,
@@ -97,7 +106,7 @@ export default function Editar() {
     if (id) fetchMovimentacao();
   }, [id, reset]);
 
-  async function onSubmit(data: EditarData) {
+  const onSubmit = handleSubmit(async (data: EditarData) => {
     if (!user || !id) {
       alert("Usuário ou ID inválido");
       return;
@@ -130,13 +139,13 @@ export default function Editar() {
 
     alert("Registro atualizado com sucesso!");
     navigate("/dashboard");
-  }
+  });
 
   if (loading) return <p>Carregando...</p>;
 
   return (
     <div className={styles.container}>
-      <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+      <form onSubmit={onSubmit} className={styles.form}>
         <h1>Editar Receita / Despesa</h1>
 
         <div className={styles.field}>

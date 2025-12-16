@@ -4,6 +4,7 @@ import { useAuth } from "../../Hook/useAuth";
 import { supabase } from "../../lib/supabaseClient";
 import styles from "./dashboard.module.css";
 import { useNavigate } from "react-router-dom";
+import z from "zod";
 
 type Movimentacao = {
   drs_id: string;
@@ -24,8 +25,24 @@ type DBResponse = {
   drs_dt_pagamento?: string | null;
   tipo_receita: {
     tpr_tipo: string;
-  };
+  }[];
 };
+
+const dbResponseSchema = z.array(
+  z.object({
+    drs_id: z.string(),
+    drs_valor: z.number(),
+    drs_descricao: z.string(),
+    is_paid: z.boolean(),
+    drs_dt_lancamento: z.string(),
+    drs_dt_pagamento: z.string().nullable().optional(),
+    tipo_receita: z.array(
+      z.object({
+        tpr_tipo: z.string(),
+      })
+    ),
+  })
+);
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -83,8 +100,14 @@ export default function Dashboard() {
     let totalReceitas = 0;
     let totalDespesas = 0;
 
-    const mapped: Movimentacao[] = (data as DBResponse[]).map((item) => {
-      const tipo = item.tipo_receita.tpr_tipo.toLowerCase() as
+    const parsed = dbResponseSchema.safeParse(data ?? []);
+    if (!parsed.success) {
+      console.error(parsed.error);
+      return;
+    }
+
+    const mapped: Movimentacao[] = parsed.data.map((item: DBResponse) => {
+      const tipo = item.tipo_receita[0].tpr_tipo.toLowerCase() as
         | "receita"
         | "despesa";
 
